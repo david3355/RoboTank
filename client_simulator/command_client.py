@@ -2,6 +2,7 @@ import requests
 
 
 class CommandClient:
+    COMMANDEER = "commandeer"
     SPEED = "speed"
     PROCESS_MODE = "processmode"
     PROCESS_MODES = "processmodes"
@@ -12,6 +13,11 @@ class CommandClient:
 
     def __get_url(self, resource):
         return "http://{}:{}/{}".format(self.address, self.port, resource)
+
+    def commandeer(self, id):
+        resp = requests.post(url=self.__get_url(CommandClient.COMMANDEER), json={"id": id})
+        if resp.status_code == 200:
+            return resp.json()
 
     def set_speed(self, left_speed, right_speed):
         resp = requests.post(url=self.__get_url(CommandClient.SPEED),

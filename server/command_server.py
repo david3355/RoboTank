@@ -36,6 +36,7 @@ class CommandHandler(server.BaseHTTPRequestHandler):
         CommandHandler.ROUTING_TABLE["/control"] = ControlHandler
         CommandHandler.ROUTING_TABLE["/processmode"] = ModeHandler
         CommandHandler.ROUTING_TABLE["/processmodes"] = ModesHandler
+        CommandHandler.ROUTING_TABLE["/commandeer"] = CommandeerHandler
         for route, processor in self.ROUTING_TABLE.items():
             if route == path:
                 return processor()
@@ -80,6 +81,19 @@ class BaseHandler:
         handler.send_response(error_code)
         handler.set_headers({'Content-Type': 'application/json'})
         handler.set_return_value({"error": message})
+
+
+class CommandeerHandler(BaseHandler):
+    def post(self, base_handler, data: dict):
+        base_handler.send_response(202)
+        id = data.get("id")
+        if id is not None:
+            # TODO start receiving UDP
+            # TODO start sending status
+            base_handler.set_headers({'Content-Type': 'application/json'})
+            base_handler.set_return_value({"status": "Receiving control over UDP, sending status", "id": id})
+        else:
+            self.handle_error(base_handler, 422, "Please provide a commandeer ID!")
 
 
 class SpeedHandler(BaseHandler):
