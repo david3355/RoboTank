@@ -34,10 +34,10 @@ class CommandProcessor(Processor):
     def __get_processor(self, process_mode):
         procs = {
             ProcessMode.MANUAL: ManualProcessor,
-            ProcessMode.CONTROLLED: ControlledlProcessor
+            ProcessMode.CONTROLLED: ControllerProcessor
         }
 
-        processor = procs.get(process_mode, ControlledlProcessor)
+        processor = procs.get(process_mode, ControllerProcessor)
         return processor(self.driver)
 
     def set_process_mode(self, process_mode: str):
@@ -75,12 +75,12 @@ class ManualProcessor(BaseProcessor):
 
     def process(self, command: str):
         tags = command.split(":")
-        left_track = int(tags[0])
-        right_track = int(tags[1])
+        left_track = int(tags[0]) / 100.0
+        right_track = int(tags[1]) / 100.0
         self.driver.set_track(left_track, right_track)
 
 
-class ControlledlProcessor(BaseProcessor):
+class ControllerProcessor(BaseProcessor):
 
     def valid(self, command: str):
         tags = command.split(";")
@@ -93,3 +93,4 @@ class ControlledlProcessor(BaseProcessor):
         x_axis = int(tags[0])
         y_axis = int(tags[1])
         self.driver.joystick_control(x_axis, y_axis)
+
