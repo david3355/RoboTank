@@ -1,16 +1,17 @@
-# Jager
+# Jager's RoboTank Project
+
 from motor.driver import MotorDriver
+from network.discovery.broadcaster import Broadcaster
 from server.command_server import CommandServer, CommandHandler
 from server.control_server import ControlServer
 from server.processor import CommandProcessor
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
-
 if __name__ == '__main__':
+    broadcaster = Broadcaster(broadcast_interval_sec=2)
+    # wlan_interface_name="enp0s3" For virtualbox test
+    broadcaster.start_broadcasting()
+
     driver = MotorDriver()
     cmd_processor = CommandProcessor(driver)
 
@@ -29,6 +30,4 @@ if __name__ == '__main__':
 
     command_server.stop()
     control_server.stop()
-
-
-
+    broadcaster.stop_broadcasting()
