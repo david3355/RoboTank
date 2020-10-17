@@ -37,14 +37,14 @@ class MotorDriver:
         if self.__throttle_is_valid(throttle):
             throttle = self.__balance_throttle(throttle)
             self.left_speed = throttle
-            self.engine_ctrl.motor1.throttle = throttle
+            self.engine_ctrl.motor2.throttle = throttle
             print("Left engine speed: {}".format(throttle))
 
     def __set_right_motor(self, throttle):
         if self.__throttle_is_valid(-throttle):
             throttle = self.__balance_throttle(throttle)
             self.right_speed = -throttle
-            self.engine_ctrl.motor2.throttle = -throttle
+            self.engine_ctrl.motor1.throttle = -throttle
             print("Right engine speed: {}".format(throttle))
 
     def __balance_throttle(self, throttle):
