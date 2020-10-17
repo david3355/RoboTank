@@ -49,9 +49,9 @@ class JoystickControlStrategy(ControlStrategy):
         sx = sign(control_x)
         sy = sign(control_y)
 
-        if self.almost_equal(control_y, 0):
+        if self.almost_equal(control_y, 0, e=10):
             return EngineThrottle(sx * strength, sx * strength)
-        if self.almost_equal(control_x, 0):
+        if self.almost_equal(control_x, 0, e=10):
             return EngineThrottle(sy * strength, -sy * strength)
 
         if control_x == 0 or control_y == 0:

@@ -4,6 +4,7 @@ import socketserver
 from http import server
 from threading import Thread
 
+from camera.camera_helper import CameraHelper
 from motor.driver import MotorDriver
 from robologger.robologger import get_logger
 from server.processor import CommandProcessor, ProcessMode
@@ -37,6 +38,8 @@ class CommandHandler(server.BaseHTTPRequestHandler):
         CommandHandler.ROUTING_TABLE["/processmode"] = ModeHandler
         CommandHandler.ROUTING_TABLE["/processmodes"] = ModesHandler
         CommandHandler.ROUTING_TABLE["/commandeer"] = CommandeerHandler
+        CommandHandler.ROUTING_TABLE["/camera"] = CameraHandler
+        CommandHandler.ROUTING_TABLE["/get_cam_status"] = CameraHandler
         for route, processor in self.ROUTING_TABLE.items():
             if route == path:
                 return processor()
@@ -94,6 +97,32 @@ class CommandeerHandler(BaseHandler):
             base_handler.set_return_value({"status": "Receiving control over UDP, sending status", "id": id})
         else:
             self.handle_error(base_handler, 422, "Please provide a commandeer ID!")
+
+
+class CameraHandler(BaseHandler):
+    def __init__(self):
+        self.cam_helper = CameraHelper()
+
+    def get(self, base_handler):
+        base_handler.send_response(200)
+        base_handler.set_headers({'Content-Type': 'application/json'})
+
+        base_handler.set_return_value(
+            {"broadcast_address": self.cam_helper.get_broadcast_address(),
+             "broadcast_port": self.cam_helper.get_broadcast_port(),
+             "status": self.cam_helper.get_status()})
+
+    def post(self, base_handler, data: dict):
+        base_handler.send_response(202)
+        cmd = data.get("command")
+        if cmd == "start":
+            broadcast_address = data.get("broadcast_address", None)
+            broadcast_port = data.get("broadcast_port", None)
+            self.cam_helper.set_broadcast_address(broadcast_address)
+            self.cam_helper.set_broadcast_port(broadcast_port)
+            self.cam_helper.start_camera()
+        elif cmd == "stop":
+            self.cam_helper.stop_camera()
 
 
 class SpeedHandler(BaseHandler):

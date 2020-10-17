@@ -109,6 +109,11 @@ class MotorDriver:
         :return:
         """
         #print("AxisX: {}; AxisY: {}".format(axisX, axisY))
+
+        ### Change the front of the robot ###
+        #axisX = -axisX
+        #####################################
+
         engine_throttle = self.joystick_control_strategy.calculate_strategy(axisX, axisY)
         print("Left throttle: {} ||| Right throttle: {}".format(engine_throttle.left_throttle, engine_throttle.right_throttle))
         self.__set_left_motor(engine_throttle.left_throttle)
