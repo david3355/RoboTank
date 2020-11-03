@@ -32,7 +32,7 @@ class CameraHelper:
             print("Stopped raspivid ({})".format(self.cam_pid))
 
     def __build_cmd(self, params):
-        vid_cmd = ['raspivid', '-a', '12', '-t', '0', '-w', '1280', '-h', '720', '-hf', '-ih', '-fps', '30', '-o',
+        vid_cmd = ['raspivid', '-a', '12', '-t', '0', '-w', '1280', '-h', '720', '-ih', '-fps', '30', '-o',
                    'udp://{host}:{port}'.format(**params)]
         return vid_cmd
 
