@@ -8,6 +8,7 @@ from camera.camera_helper import CameraHelper
 from motor.driver import MotorDriver
 from robologger.robologger import get_logger
 from server.processor import CommandProcessor, ProcessMode
+from system.syshelper import shutdown, restart, get_uptime
 
 log = get_logger('RoboCar control server')
 
@@ -40,6 +41,7 @@ class CommandHandler(server.BaseHTTPRequestHandler):
         CommandHandler.ROUTING_TABLE["/commandeer"] = CommandeerHandler
         CommandHandler.ROUTING_TABLE["/camera"] = CameraHandler
         CommandHandler.ROUTING_TABLE["/get_cam_status"] = CameraHandler
+        CommandHandler.ROUTING_TABLE["/system"] = SystemHandler
         for route, processor in self.ROUTING_TABLE.items():
             if route == path:
                 return processor()
@@ -97,6 +99,26 @@ class CommandeerHandler(BaseHandler):
             base_handler.set_return_value({"status": "Receiving control over UDP, sending status", "id": id})
         else:
             self.handle_error(base_handler, 422, "Please provide a commandeer ID!")
+
+
+class SystemHandler(BaseHandler):
+    CMDS = {
+        "shutdown": shutdown,
+        "restart": restart
+    }
+
+    def post(self, base_handler, data: dict):
+        base_handler.send_response(202)
+        command = data.get("command")
+        if command is not None and command is not None:
+            cmd_func = SystemHandler.CMDS.get(command)
+            if cmd_func is not None:
+                cmd_func()
+
+    def get(self, base_handler):
+        base_handler.send_response(200)
+        base_handler.set_headers({'Content-Type': 'application/json'})
+        base_handler.set_return_value({"uptime": get_uptime()})
 
 
 class CameraHandler(BaseHandler):
