@@ -21,6 +21,7 @@ rec.start()
 
 sending = True
 
+
 def sender():
     while sending: #inp != "x":
         # inp = str(input("Command: "))
@@ -28,7 +29,7 @@ def sender():
         x = rnd.randint(*rng)
         y = rnd.randint(*rng)
         rc = "{};{}".format(x, y)
-        print("Sending {}".format(rc))
+        # print("Sending {}".format(rc))
         client.send(rc)
         sleep(0.5)
 
@@ -42,7 +43,9 @@ command_client = CommandClient("127.0.0.1", 25500)
 
 def process_input(cmd_input):
     params = cmd_input.split(" ")
-    if params[0] == "getspeed":
+    if params[0] == "commandeer":
+        command_client.commandeer(params[1])
+    elif params[0] == "getspeed":
         print (command_client.get_speed())
     elif params[0] == "setspeed":
         command_client.set_speed(params[1], params[2])

@@ -1,39 +1,53 @@
 import subprocess
 
+from robologger.robologger import get_logger
+
+log = get_logger('RoboCar control server')
+
 
 class CameraHelper:
     STATUS_BROADCASTING = "BROADCASTING"
     STATUS_OFF = "OFF"
+    CAMERA_PID = None
+    BROADCASTING = False
 
     def __init__(self):
         self.broadcast_address = None
         self.broadcast_port = 25005
-        self.broadcasting = False
-        self.cam_pid = None
+        self.width = 1280
+        self.height = 720
 
     def start_camera(self):
         params = {
             "host": self.broadcast_address,
-            "port": self.broadcast_port}
+            "port": self.broadcast_port,
+            "w": self.width,
+            "h": self.height}
         cmd = self.__build_cmd(params)
-        print("Run command: {}".format(cmd))
+        log.info("Run command: {}".format(cmd))
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        self.broadcasting = True
-        self.cam_pid = process.pid
-        output, error = process.communicate()
-        print("Camera started. Output: {}, Error: {}, PID: {}".format(output, error, self.cam_pid))
-        return output
+        CameraHelper.BROADCASTING = True
+        CameraHelper.CAMERA_PID = process.pid
+        #output, error = process.communicate()
+        log.info("Camera started. PID: {}".format(CameraHelper.CAMERA_PID))
+        return CameraHelper.CAMERA_PID
 
     def stop_camera(self):
-        if self.cam_pid is not None:
-            cmd = ["sudo", "kill", str(self.cam_pid)]
-            print("Stopping raspivid ({})".format(self.cam_pid))
-            subprocess.Popen(cmd, stdout=subprocess.PIPE)
-            print("Stopped raspivid ({})".format(self.cam_pid))
+        pid = CameraHelper.CAMERA_PID
+        if pid is not None:
+            cmd = ["sudo", "kill", str(pid)]
+            log.info("Stopping raspivid ({})".format(pid))
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            #output, error = process.communicate()
+            log.info("Stopped raspivid ({})".format(pid))
+            return True
+        else:
+            log.warn("Camera process ID is not saved")
+            return False
 
     def __build_cmd(self, params):
-        vid_cmd = ['raspivid', '-a', '12', '-t', '0', '-w', '1280', '-h', '720', '-ih', '-fps', '30', '-o',
-                   'udp://{host}:{port}'.format(**params)]
+        vid_cmd = ['raspivid', '-a', '12', '-t', '0', '-w', str(params.get("w")), '-h', str(params.get("h")),
+                   '-ih', '-fps', '30', '-o', 'udp://{host}:{port}'.format(**params)]
         return vid_cmd
 
     def set_broadcast_address(self, broadcast_address):
@@ -44,14 +58,28 @@ class CameraHelper:
         if self.__value_is_valid(broadcast_port):
             self.broadcast_port = broadcast_port
 
+    def set_width(self, width):
+        if self.__value_is_valid(width):
+            self.width = width
+
+    def set_height(self, height):
+        if self.__value_is_valid(height):
+            self.height = height
+
     def get_broadcast_address(self):
         return self.broadcast_address
 
     def get_broadcast_port(self):
         return self.broadcast_port
 
+    def get_width(self):
+        return self.width
+
+    def get_height(self):
+        return self.height
+
     def get_status(self):
-        return self.STATUS_BROADCASTING if self.broadcasting else self.STATUS_OFF
+        return self.STATUS_BROADCASTING if CameraHelper.BROADCASTING else self.STATUS_OFF
 
     @staticmethod
     def __value_is_valid(value):

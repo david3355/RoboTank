@@ -1,11 +1,13 @@
 import subprocess
 
 
-def shutdown(delay='now'):
+# Default delay is 1 sec instead of 'now' so leave time to respond to client
+
+def shutdown(delay='1'):
     subprocess.Popen(['sudo', 'shutdown', '-h', delay])
 
 
-def restart(delay='now'):
+def restart(delay='1'):
     subprocess.Popen(['sudo', 'shutdown', '-r', delay])
 
 

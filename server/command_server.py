@@ -1,13 +1,15 @@
 # REST service for controlling robot
+
 import json
 import socketserver
+import types
 from http import server
 from threading import Thread
 
 from camera.camera_helper import CameraHelper
 from motor.driver import MotorDriver
 from robologger.robologger import get_logger
-from server.processor import CommandProcessor, ProcessMode
+from server.processor import ControlSignalProcessor, ProcessMode
 from system.syshelper import shutdown, restart, get_uptime
 
 log = get_logger('RoboCar control server')
@@ -17,14 +19,19 @@ class CommandHandler(server.BaseHTTPRequestHandler):
     ROUTING_TABLE = {}
     driver = None
     cmd_processor = None
+    set_command_host_callback = None
 
     @staticmethod
     def set_driver(driver: MotorDriver):
         CommandHandler.driver = driver
 
     @staticmethod
-    def set_command_processor(command_processor: CommandProcessor):
+    def set_command_processor(command_processor: ControlSignalProcessor):
         CommandHandler.cmd_processor = command_processor
+
+    @staticmethod
+    def set_commandeer_handler(set_command_host_callback: types.FunctionType):
+        CommandHandler.set_command_host_callback = set_command_host_callback
 
     def get(self):
         pass
@@ -48,22 +55,35 @@ class CommandHandler(server.BaseHTTPRequestHandler):
         return None
 
     def do_POST(self):
-        data_string = self.rfile.read(int(self.headers['Content-Length']))
-        data_json = json.loads(data_string)
-        handler = self.route(self.path)
-        if handler is not None:
-            handler.post(self, data_json)
-        else:
-            self.send_response(404)
+        try:
+            data_string = self.rfile.read(int(self.headers['Content-Length']))
+            data_json = json.loads(data_string)
+            handler = self.route(self.path)
+            if handler is not None:
+                handler.post(self, data_json)
+            else:
+                self.send_response(404)
+                self.set_headers({'Content-Type': 'application/json'})
+                self.set_return_value({"status": "no such resource"})
+                log.warn("Resource is not found: %s", self.path)
+        except BaseException as bex:
+            self.send_response(500, message=str(bex))
+            log.warn("Error while processing request on %s: %s", self.path, str(bex))
 
     def do_GET(self):
-        handler = self.route(self.path)
-        if handler is not None:
-            handler.get(self)
-        else:
-            self.send_response(404)
-            self.set_headers({'Content-Type': 'application/json'})
-            self.set_return_value({"status": "no such resource"})
+        try:
+            handler = self.route(self.path)
+            if handler is not None:
+                handler.get(self)
+            else:
+                self.send_response(404)
+                self.set_headers({'Content-Type': 'application/json'})
+                self.set_return_value({"status": "no such resource"})
+                log.warn("Resource is not found: %s", self.path)
+        except BaseException as bex:
+            self.send_response(500, message=str(bex))
+            log.warn("Error while processing request on %s: %s", self.path, str(bex))
+
 
     # Handlers:
 
@@ -87,16 +107,24 @@ class BaseHandler:
         handler.set_headers({'Content-Type': 'application/json'})
         handler.set_return_value({"error": message})
 
+    def set_response(self, handler, status, resp_value):
+        handler.send_response(status)
+        handler.set_headers({'Content-Type': 'application/json'})
+        handler.set_return_value(resp_value)
+
 
 class CommandeerHandler(BaseHandler):
     def post(self, base_handler, data: dict):
-        base_handler.send_response(202)
         id = data.get("id")
+        commander_host = base_handler.client_address[0]
+        print("Commandeer: {} - {}".format(commander_host, id))
         if id is not None:
+            if CommandHandler.set_command_host_callback is not None:
+                CommandHandler.set_command_host_callback(commander_host)
             # TODO start receiving UDP
             # TODO start sending status
-            base_handler.set_headers({'Content-Type': 'application/json'})
-            base_handler.set_return_value({"status": "Receiving control over UDP, sending status", "id": id})
+            self.set_response(base_handler, 202, {"status": "Receiving control over UDP, sending status", "id": id,
+                                                  "commander_host": commander_host})
         else:
             self.handle_error(base_handler, 422, "Please provide a commandeer ID!")
 
@@ -114,11 +142,10 @@ class SystemHandler(BaseHandler):
             cmd_func = SystemHandler.CMDS.get(command)
             if cmd_func is not None:
                 cmd_func()
+                self.set_response(base_handler, 200, {"command_executed": command})
 
     def get(self, base_handler):
-        base_handler.send_response(200)
-        base_handler.set_headers({'Content-Type': 'application/json'})
-        base_handler.set_return_value({"uptime": get_uptime()})
+        self.set_response(base_handler, 200, {"uptime": get_uptime()})
 
 
 class CameraHandler(BaseHandler):
@@ -135,34 +162,39 @@ class CameraHandler(BaseHandler):
              "status": self.cam_helper.get_status()})
 
     def post(self, base_handler, data: dict):
-        base_handler.send_response(202)
+
         cmd = data.get("command")
         if cmd == "start":
             broadcast_address = data.get("broadcast_address", None)
             broadcast_port = data.get("broadcast_port", None)
+            width = data.get("width", None)
+            height = data.get("height", None)
             self.cam_helper.set_broadcast_address(broadcast_address)
             self.cam_helper.set_broadcast_port(broadcast_port)
+            self.cam_helper.set_width(width)
+            self.cam_helper.set_height(height)
             self.cam_helper.start_camera()
+            self.set_response(base_handler, 202, {"status": "started", "params": "{}, {}, {}, {}".format(
+                broadcast_address, broadcast_port, width, height)})
         elif cmd == "stop":
             self.cam_helper.stop_camera()
+            self.set_response(base_handler, 202, {"status": "stopped"})
 
 
 class SpeedHandler(BaseHandler):
     def get(self, base_handler):
         left_speed = CommandHandler.driver.left_speed
         right_speed = CommandHandler.driver.right_speed
-        base_handler.send_response(200)
-        base_handler.set_headers({'Content-Type': 'application/json'})
-        base_handler.set_return_value({"left_speed": left_speed, "right_speed": right_speed})
+        self.set_response(base_handler, 200, {"left_speed": left_speed, "right_speed": right_speed})
 
     def post(self, base_handler, data: dict):
-        base_handler.send_response(202)
         left_speed = data.get("left_speed")
         right_speed = data.get("right_speed")
         if left_speed is not None:
             CommandHandler.driver.left_speed = left_speed
         if right_speed is not None:
             CommandHandler.driver.right_speed = right_speed
+        self.set_response(base_handler, 202, {"left_speed": left_speed, "right_speed": right_speed})
 
 
 class ControlHandler(BaseHandler):
@@ -172,6 +204,7 @@ class ControlHandler(BaseHandler):
         distance = data.get("distance")
         if direction is not None and distance is not None:
             CommandHandler.driver.go_forward(distance, 10)
+            self.set_response(base_handler, 202, {"direction": direction, "distance": distance})
 
 
 class ModeHandler(BaseHandler):
@@ -179,28 +212,22 @@ class ModeHandler(BaseHandler):
         return mode in ProcessMode.get_modes()
 
     def post(self, base_handler, data: dict):
-        base_handler.send_response(202)
         mode = data.get("mode")
         if mode is not None and self.validate_mode(mode):
             CommandHandler.cmd_processor.set_process_mode(mode)
-            base_handler.set_headers({'Content-Type': 'application/json'})
-            base_handler.set_return_value({"process_mode": mode})
+            self.set_response(base_handler, 202, {"process_mode": mode})
         else:
             self.handle_error(base_handler, 422, "mode {} is not valid".format(mode))
 
     def get(self, base_handler):
-        base_handler.send_response(200)
         process_mode = CommandHandler.cmd_processor.get_process_mode()
-        base_handler.set_headers({'Content-Type': 'application/json'})
-        base_handler.set_return_value({"process_mode": process_mode})
+        self.set_response(base_handler, 200, {"process_mode": process_mode})
 
 
 class ModesHandler(BaseHandler):
     def get(self, base_handler):
-        base_handler.send_response(200)
         process_modes = ProcessMode.get_modes()
-        base_handler.set_headers({'Content-Type': 'application/json'})
-        base_handler.set_return_value({"process_modes": process_modes})
+        self.set_response(base_handler, 200, {"process_modes": process_modes})
 
 
 class CmdServer(socketserver.ThreadingMixIn, server.HTTPServer):

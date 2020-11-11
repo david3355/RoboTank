@@ -19,6 +19,7 @@ class ControlServer:
         self.processors = []
         self.sock = None
         self.receiving = False
+        self.commander_host = None
 
     def start(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -27,13 +28,6 @@ class ControlServer:
         self.sock.bind((self.host, self.port))
         receiver = Thread(target=self.__receive)
         receiver.start()
-
-    def __receive(self):
-        log.info("Receiving data...")
-        self.receiving = True
-        while self.receiving:
-            (data, addr) = self.sock.recvfrom(1024)
-            self.__process(data.decode("utf-8"))
 
     def stop(self):
         log.info("Stopping control server...")
@@ -45,8 +39,24 @@ class ControlServer:
     def add_command_processor(self, processor: Processor):
         self.processors.append(processor)
 
-    def __process(self, command: str):
-        log.info("Processing command: %s", command)
+    def set_commander(self, commander_host):
+        self.commander_host = commander_host
+
+    def __receive(self):
+        self.receiving = True
+        while self.receiving:
+            (data, sender) = self.sock.recvfrom(1024)
+            self.__process(data.decode("utf-8"), sender)
+
+    def __is_commander_host_valid(self, commander_address):
+        if self.commander_host is None:
+            return False
+        return self.commander_host == commander_address
+
+    def __process(self, command: str, sender: str):
+        if not self.__is_commander_host_valid(sender[0]):
+            return
+        log.debug("Processing signal from [%s]: %s", sender, command)
         for processor in self.processors:
             processor.process(command)
 

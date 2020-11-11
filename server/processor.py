@@ -13,7 +13,7 @@ class Processor:
         pass
 
     @abstractmethod
-    def _valid(self, command: str):
+    def valid(self, command: str):
         pass
 
 
@@ -25,7 +25,8 @@ class ProcessMode:
     def get_modes():
         return [ProcessMode.CONTROLLED, ProcessMode.MANUAL]
 
-class CommandProcessor(Processor):
+
+class ControlSignalProcessor(Processor):
     def __init__(self, motor_driver: MotorDriver):
         self.driver = motor_driver
         self.process_mode = ProcessMode.CONTROLLED
@@ -43,7 +44,6 @@ class CommandProcessor(Processor):
     def set_process_mode(self, process_mode: str):
         self.process_mode = process_mode
         self.processor = self.__get_processor(self.process_mode)
-
 
     def get_process_mode(self):
         return self.process_mode

@@ -28,7 +28,7 @@ class MotorDriver:
     def __init__(self):
         self.left_speed = 0
         self.right_speed = 0
-        #self.engine_ctrl = MotorKit()
+        # self.engine_ctrl = MotorKit()
         self.engine_ctrl = MotorKit(i2c=board.I2C())
         self.lowest_throttle = self.DEFAULT_LOWEST_THROTTLE
         self.joystick_control_strategy = JoystickControlStrategy()

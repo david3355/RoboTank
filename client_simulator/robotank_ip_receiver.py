@@ -30,4 +30,5 @@ class RoboTankAddressReceiver:
             self.sock.close()
 
     def __process(self, data: str):
-        print(data)
+        # print(data)
+        pass
