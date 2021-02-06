@@ -8,6 +8,7 @@ from threading import Thread
 
 from camera.camera_helper import CameraHelper
 from motor.driver import MotorDriver
+from network.discovery.network_interface_helper import get_interfaces, get_ip, get_netmask, get_broadcast
 from robologger.robologger import get_logger
 from server.processor import ControlSignalProcessor, ProcessMode
 from system.syshelper import shutdown, restart, get_uptime
@@ -49,6 +50,7 @@ class CommandHandler(server.BaseHTTPRequestHandler):
         CommandHandler.ROUTING_TABLE["/camera"] = CameraHandler
         CommandHandler.ROUTING_TABLE["/get_cam_status"] = CameraHandler
         CommandHandler.ROUTING_TABLE["/system"] = SystemHandler
+        CommandHandler.ROUTING_TABLE["/interfaces"] = InterfacesHandler
         for route, processor in self.ROUTING_TABLE.items():
             if route == path:
                 return processor()
@@ -228,6 +230,19 @@ class ModesHandler(BaseHandler):
     def get(self, base_handler):
         process_modes = ProcessMode.get_modes()
         self.set_response(base_handler, 200, {"process_modes": process_modes})
+
+
+class InterfacesHandler(BaseHandler):
+    def get(self, base_handler):
+        interfaces = get_interfaces("wlan")
+        interface_data = {}
+        for iface in interfaces:
+            interface_data[iface] = {
+                "ip_address": get_ip(iface),
+                "netmask": get_netmask(iface),
+                "broadcast": get_broadcast(iface)
+            }
+        self.set_response(base_handler, 200, interface_data)
 
 
 class CmdServer(socketserver.ThreadingMixIn, server.HTTPServer):

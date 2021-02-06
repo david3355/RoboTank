@@ -13,6 +13,11 @@ def get_broadcast(interface):
     return ip
 
 
+def get_netmask(interface):
+    ip = ni.ifaddresses(interface)[ni.AF_INET][0]['netmask']
+    return ip
+
+
 def get_interfaces(name_filter=""):
     interfaces = ni.interfaces()
     return [iface for iface in interfaces if name_filter in iface]
