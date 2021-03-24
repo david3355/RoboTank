@@ -9,7 +9,7 @@ from threading import Thread
 from camera.camera_helper import CameraHelper
 from motor.driver import MotorDriver
 from network.discovery.network_interface_helper import get_interfaces, get_ip, get_netmask, get_broadcast
-from network.wifi import get_available_networks
+from network.wifi import get_available_networks, connect_to_wifi, get_connected_wifi_ssid
 from robologger.robologger import get_logger
 from server.processor import ControlSignalProcessor, ProcessMode
 from system.syshelper import shutdown, restart, get_uptime
@@ -52,7 +52,8 @@ class CommandHandler(server.BaseHTTPRequestHandler):
         CommandHandler.ROUTING_TABLE["/get_cam_status"] = CameraHandler
         CommandHandler.ROUTING_TABLE["/system"] = SystemHandler
         CommandHandler.ROUTING_TABLE["/interfaces"] = InterfacesHandler
-        CommandHandler.ROUTING_TABLE["/wifinetworks"] = WifiHandler
+        CommandHandler.ROUTING_TABLE["/wifinetworks"] = WifiNetworksHandler
+        CommandHandler.ROUTING_TABLE["/connection"] = WifiConnectionHandler
 
         for route, processor in self.ROUTING_TABLE.items():
             if route == path:
@@ -248,10 +249,31 @@ class InterfacesHandler(BaseHandler):
         self.set_response(base_handler, 200, interface_data)
 
 
-class WifiHandler(BaseHandler):
+class WifiNetworksHandler(BaseHandler):
     def get(self, base_handler):
         networks = get_available_networks("wlan0")
         self.set_response(base_handler, 200, networks)
+
+
+class WifiConnectionHandler(BaseHandler):
+    def validate(self, ssid, psk):
+        return ssid is not None and ssid != "" and (psk is None or 8 <= len(psk) <= 63)
+
+    def post(self, base_handler, data: dict):
+        ssid = data.get("ssid")
+        pre_shared_key = data.get("psk", None)
+        if self.validate(ssid, pre_shared_key):
+            if pre_shared_key is None:
+                result = connect_to_wifi(ssid)
+            else:
+                result = connect_to_wifi(ssid, pre_shared_key)
+            self.set_response(base_handler, 202, {"status": result})
+        else:
+            self.handle_error(base_handler, 422, "SSID cannot be empty, PSK must be 8-63 characters!")
+
+    def get(self, base_handler):
+        connected_network = get_connected_wifi_ssid()
+        self.set_response(base_handler, 200, {"connection_info": connected_network})
 
 
 class CmdServer(socketserver.ThreadingMixIn, server.HTTPServer):
